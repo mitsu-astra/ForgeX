@@ -1,0 +1,74 @@
+{
+  "model_architecture": "EfficientNet-B4",
+  "num_classes": 5,
+  "classes": [
+    "crack",
+    "hole",
+    "normal",
+    "rust",
+    "scratch"
+  ],
+  "best_val_accuracy": 1.0,
+  "best_val_f1": 1.0,
+  "test_metrics": {
+    "loss": 0.2317,
+    "accuracy": 0.9994,
+    "f1_macro": 0.9994,
+    "precision_macro": 0.9994,
+    "recall_macro": 0.9994
+  },
+  "total_training_time_sec": 517.2,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.4807,
+      "train_acc": 0.9467,
+      "val_loss": 0.2315,
+      "val_acc": 1.0,
+      "val_f1": 1.0,
+      "lr": 9.1e-05,
+      "duration_sec": 104.3
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.2374,
+      "train_acc": 0.9992,
+      "val_loss": 0.2273,
+      "val_acc": 1.0,
+      "val_f1": 1.0,
+      "lr": 6.6e-05,
+      "duration_sec": 103.5
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.2333,
+      "train_acc": 0.9993,
+      "val_loss": 0.2261,
+      "val_acc": 1.0,
+      "val_f1": 1.0,
+      "lr": 3.5e-05,
+      "duration_sec": 101.7
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.2313,
+      "train_acc": 0.9995,
+      "val_loss": 0.226,
+      "val_acc": 1.0,
+      "val_f1": 1.0,
+      "lr": 1e-05,
+      "duration_sec": 104.4
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.2305,
+      "train_acc": 0.9998,
+      "val_loss": 0.2255,
+      "val_acc": 1.0,
+      "val_f1": 1.0,
+      "lr": 1e-06,
+      "duration_sec": 103.0
+    }
+  ],
+  "checkpoint_path": "/home/koushik_2109/Hackathons/CMR/models/weights/efficientnet_b4_defect.pth"
+}

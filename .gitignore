@@ -1,0 +1,41 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment & secret files
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+frontend/.env*
+
+# Datasets and simulation archives / directories
+data/
+backend/data/
+train/
+Manufacturing Data Shared Facility - Discrete-Event Simulation/
+*.zip
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

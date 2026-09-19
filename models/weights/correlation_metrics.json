@@ -1,0 +1,25 @@
+{
+  "model": "XGBoost Root Cause Classifier + SHAP TreeExplainer",
+  "num_classes": 5,
+  "classes": [
+    "storage_queue_corrosion",
+    "hydraulic_overload_stress",
+    "conveyor_speed_friction",
+    "tool_wear_drill_misalignment",
+    "nominal_in_control"
+  ],
+  "feature_names": [
+    "Queue_Time_Hours",
+    "Station_Max_Util",
+    "Conveyor_Speed_mps",
+    "Spindle_Cycles",
+    "Coolant_pH",
+    "Ambient_Humidity_pct",
+    "Forming_Pressure_bar",
+    "Feed_Rate_mm_per_min"
+  ],
+  "train_accuracy": 1.0,
+  "train_macro_f1": 1.0,
+  "test_accuracy": 1.0,
+  "test_macro_f1": 1.0
+}

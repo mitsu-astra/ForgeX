@@ -1,0 +1,74 @@
+{
+  "model_1": {
+    "metrics": {
+      "Parts per hour": {
+        "r2_score": 0.216,
+        "rmse": 98.482,
+        "mae": 78.9824
+      },
+      "Drilling Util": {
+        "r2_score": 0.2231,
+        "rmse": 0.2719,
+        "mae": 0.2224
+      },
+      "Milling Util": {
+        "r2_score": 0.2231,
+        "rmse": 0.2035,
+        "mae": 0.1664
+      },
+      "Assembly Util": {
+        "r2_score": 0.2355,
+        "rmse": 0.251,
+        "mae": 0.1971
+      },
+      "Assembly Waiting Time": {
+        "r2_score": 0.2129,
+        "rmse": 90.3895,
+        "mae": 77.1771
+      }
+    },
+    "feature_importances": {
+      "Parts per hour": {
+        "Demand": 1.0
+      },
+      "Drilling Util": {
+        "Demand": 1.0
+      },
+      "Milling Util": {
+        "Demand": 1.0
+      },
+      "Assembly Util": {
+        "Demand": 1.0
+      },
+      "Assembly Waiting Time": {
+        "Demand": 1.0
+      }
+    },
+    "trained_samples": 3000
+  },
+  "model_2": {
+    "metrics": {
+      "Entities Out": {
+        "r2_score": 0.6241,
+        "rmse": 1807.3534,
+        "mae": 1381.123
+      },
+      "Drilling Utilization": {
+        "r2_score": 0.6066,
+        "rmse": 0.172,
+        "mae": 0.1322
+      },
+      "Milling Utilization": {
+        "r2_score": 0.6115,
+        "rmse": 0.1295,
+        "mae": 0.0993
+      },
+      "Assembly Utilization": {
+        "r2_score": 0.6225,
+        "rmse": 0.1889,
+        "mae": 0.1444
+      }
+    },
+    "trained_samples": 3000
+  }
+}
