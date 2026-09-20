@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     DEFAULT_REWORK_COST_PER_UNIT: float = 30.0
     DEFAULT_CONTRIBUTION_MARGIN: float = 150.0
 
+    # OpenRouter API & Copilot Gateway
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "google/gemini-2.0-flash-lite-001:free"
+    OPENROUTER_SITE_URL: str = "http://localhost:3000"
+    OPENROUTER_APP_NAME: str = "ForgeX • Industrial Decision Intelligence Copilot"
+    OPENROUTER_MAX_TOKENS: int = 1024
+    OPENROUTER_TEMPERATURE: float = 0.2
+    COPILOT_ENABLED: bool = True
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):

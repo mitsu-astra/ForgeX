@@ -3,107 +3,94 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
+  Factory,
+  Home,
   Upload,
-  Eye,
+  Camera,
   Activity,
-  GitBranch,
+  BarChart3,
   Sliders,
-  MessageSquare,
+  Bot,
   Settings,
-  Sparkles,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 
 const navigation = [
-  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Upload", href: "/dashboard/upload", icon: Upload, badge: "New" },
-  { name: "Quality", href: "/dashboard/quality", icon: Eye },
-  { name: "Process", href: "/dashboard/process", icon: Activity },
-  { name: "Analysis", href: "/dashboard/analysis", icon: GitBranch },
-  { name: "Simulator", href: "/dashboard/simulator", icon: Sliders },
-  { name: "AI Copilot", href: "/dashboard/copilot", icon: MessageSquare, badge: "Beta" },
+  { name: "Overview", href: "/dashboard", icon: Home },
+  { name: "Upload Data Streams", href: "/dashboard/upload", icon: Upload },
+  { name: "Visual Quality Inspection", href: "/dashboard/quality", icon: Camera },
+  { name: "Process Telemetry & Flow", href: "/dashboard/process", icon: Activity },
+  { name: "Root Cause & SHAP Analysis", href: "/dashboard/analysis", icon: BarChart3 },
+  { name: "What-If Metallurgy Simulator", href: "/dashboard/simulator", icon: Sliders },
+  { name: "AI Factory Copilot", href: "/dashboard/copilot", icon: Bot },
+  { name: "Analysis Reports", href: "/dashboard/reports", icon: FileText },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-72 bg-slate-950 border-r border-white/10 flex flex-col relative overflow-hidden">
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-blue-950/20 to-transparent pointer-events-none" />
+    <aside className="w-[82px] shrink-0 rounded-[28px] bg-[#EFE9E3] flex flex-col items-center py-6 shadow-sm border border-stone-200/50 select-none">
+      {/* Factory Logo */}
+      <Link
+        href="/dashboard"
+        title="ForgeX • Industrial Decision Intelligence"
+        className="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center mb-6 shadow-sm hover:scale-105 transition-transform"
+      >
+        <Factory size={21} />
+      </Link>
 
-      {/* Logo */}
-      <div className="relative p-6 border-b border-white/10">
-        <Link href="/dashboard" className="flex items-center gap-3 group">
-          <div className="relative">
-            <div className="absolute inset-0 bg-blue-500 rounded-xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity" />
-            <div className="relative w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-          </div>
-          <div>
-            <div className="font-bold text-white text-lg">IndustryAI</div>
-            <div className="text-xs text-slate-400">Decision Intelligence</div>
-          </div>
-        </Link>
-      </div>
-
-      {/* Navigation */}
-      <nav className="relative flex-1 p-4 space-y-1">
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 mb-4">
-          Navigation
-        </div>
+      {/* Navigation Icons */}
+      <nav className="flex flex-col gap-3">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
+          const Icon = item.icon;
           return (
             <Link
               key={item.name}
               href={item.href}
+              title={item.name}
               className={cn(
-                "flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative",
+                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 relative group",
                 isActive
-                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-white shadow-lg shadow-blue-500/10"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                  ? "bg-black text-white shadow-sm"
+                  : "text-black/60 hover:text-black hover:bg-white"
               )}
             >
-              {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-r-full" />
-              )}
-              <div className="flex items-center gap-3">
-                <item.icon className={cn(
-                  "h-5 w-5 transition-transform group-hover:scale-110",
-                  isActive && "text-blue-400"
-                )} />
-                <span className="font-medium">{item.name}</span>
+              <Icon size={20} />
+              {/* Tooltip Label on Hover */}
+              <div className="absolute left-[64px] px-3 py-1.5 bg-[#181818] text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-md">
+                {item.name}
               </div>
-              {item.badge && (
-                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs px-2">
-                  {item.badge}
-                </Badge>
-              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="relative p-4 border-t border-white/10">
+      {/* Bottom Profile / Settings */}
+      <div className="mt-auto flex flex-col items-center gap-4">
         <Link
           href="/dashboard/settings"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+          title="Settings"
+          className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all relative group",
+            pathname === "/dashboard/settings"
+              ? "bg-black text-white shadow-sm"
+              : "text-black/60 hover:text-black hover:bg-white"
+          )}
         >
-          <Settings className="h-5 w-5" />
-          <span className="font-medium">Settings</span>
+          <Settings size={20} />
+          <div className="absolute left-[64px] px-3 py-1.5 bg-[#181818] text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-md">
+            Settings
+          </div>
         </Link>
 
-        {/* Status indicator */}
-        <div className="mt-4 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-green-400 font-medium">System Online</span>
-          </div>
+        <div
+          title="Authorized Operator"
+          className="w-11 h-11 rounded-full bg-[#D6B6C8] text-[#181818] flex items-center justify-center font-semibold text-sm shadow-sm"
+        >
+          A
         </div>
       </div>
     </aside>

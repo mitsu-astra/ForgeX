@@ -103,7 +103,22 @@ class BottleneckDetector:
         line_efficiency = round((mean_util / max(1e-5, max_util)) * 100.0, 1) if max_util > 0 else 100.0
 
         # Estimate economic loss
-        throughput_parts_hr = float(process_row.get("Parts per hour", process_row.get("Entities Out", 100.0)))
+        # Search for any throughput-like column dynamically
+        throughput_parts_hr: Optional[float] = None
+        throughput_col_keywords = ["parts per hour", "entities out", "throughput", "output rate", "production rate"]
+        for k, v in process_row.items():
+            k_lower = k.lower()
+            if any(kw in k_lower for kw in throughput_col_keywords):
+                try:
+                    throughput_parts_hr = float(v)
+                    break
+                except (ValueError, TypeError):
+                    pass
+
+        if throughput_parts_hr is None:
+            # Derive from mean utilization and station count as a reasonable estimate
+            throughput_parts_hr = mean_util * max(1, len(station_utils)) * 10.0
+
         theoretical_max = throughput_parts_hr / max(0.5, max_util) if max_util > 0 else throughput_parts_hr
         throughput_loss_units = max(0.0, theoretical_max - throughput_parts_hr)
         throughput_loss_usd = round(throughput_loss_units * economic_params.get("contribution_margin_per_unit", 150.0), 2)

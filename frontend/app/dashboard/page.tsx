@@ -1,21 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  CheckCircle2,
-  Package,
-  DollarSign,
+  Camera,
   Activity,
-  Eye,
-  RefreshCw,
+  Factory,
+  BarChart3,
+  AlertTriangle,
+  Bot,
+  Package,
+  ChevronRight,
+  Gauge,
+  Sliders,
+  Sparkles,
+  ArrowUpRight,
+  CheckCircle2,
+  Upload,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { getAnalyticsOverview } from "@/lib/api";
+import { formatINR } from "@/lib/currency";
 
 export default function DashboardPage() {
   const [overview, setOverview] = useState<any>(null);
@@ -28,287 +32,289 @@ export default function DashboardPage() {
         }
       })
       .catch(() => {
-        // Fallback default
+        // Fallback default state
       });
   }, []);
 
-  return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-4xl font-bold text-slate-900 mb-2">Executive Overview</h1>
-        <p className="text-slate-600">
-          Real-time manufacturing decision intelligence across computer vision QA and discrete-event flow
-        </p>
-      </div>
+  const kpis = overview?.kpis;
+  const hasInspectionData = (kpis?.total_inspected_today || 0) > 0;
+  const hasProcessData = (kpis?.current_line_throughput_pph || 0) > 0;
+  const hasAnyData = hasInspectionData || hasProcessData;
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard
-          title="Overall Yield"
-          value={overview?.kpis?.overall_yield_pct ? `${overview.kpis.overall_yield_pct}%` : "96.8%"}
-          change="+1.2%"
-          trend="up"
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          iconColor="text-green-500"
-          bgColor="bg-green-50"
-        />
-        <KPICard
-          title="Line Throughput"
-          value={overview?.kpis?.current_line_throughput_pph ? `${overview.kpis.current_line_throughput_pph}/hr` : "145.0/hr"}
-          change="+5.2%"
-          trend="up"
-          icon={<Activity className="h-5 w-5" />}
-          iconColor="text-blue-500"
-          bgColor="bg-blue-50"
-        />
-        <KPICard
-          title="Primary Bottleneck"
-          value={overview?.kpis?.primary_bottleneck_station ? `${overview.kpis.primary_bottleneck_station} (${overview.kpis.bottleneck_utilization_pct}%)` : "Drilling (96%)"}
-          change="Station Limit"
-          trend="down"
-          icon={<AlertTriangle className="h-5 w-5" />}
-          iconColor="text-red-500"
-          bgColor="bg-red-50"
-        />
-        <KPICard
-          title="Est. Monthly Loss"
-          value={overview?.kpis?.estimated_monthly_scrap_loss_usd ? `$${(overview.kpis.estimated_monthly_scrap_loss_usd / 1000).toFixed(1)}K` : "$13.5K"}
-          change="-12.3%"
-          trend="down"
-          icon={<DollarSign className="h-5 w-5" />}
-          iconColor="text-purple-500"
-          bgColor="bg-purple-50"
-        />
-      </div>
+  const yieldPct = hasInspectionData ? `${kpis.overall_yield_pct}%` : "—";
+  const throughput = hasProcessData ? `${kpis.current_line_throughput_pph}/hr` : "—";
+  const monthlyLossUSD = kpis?.estimated_monthly_scrap_loss_usd || 0;
+  const monthlyLossINR = monthlyLossUSD > 0 ? formatINR(monthlyLossUSD, { compact: true }) : "₹0";
 
-      {/* Main Content */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Recent Batches */}
-        <Card className="lg:col-span-2 hover-lift border-slate-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-slate-900">
-              <Package className="h-5 w-5 text-blue-500" />
-              Recent Production Batches
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <BatchItem
-              batch="BATCH-2026-001"
-              images={142}
-              defects={18}
-              status="completed"
-              time="10 mins ago"
-            />
-            <BatchItem
-              batch="BATCH-2026-002"
-              images={95}
-              defects={9}
-              status="completed"
-              time="1 hour ago"
-            />
-            <BatchItem
-              batch="BATCH-2026-003"
-              images={120}
-              defects={14}
-              status="processing"
-              time="Just now"
-            />
-          </CardContent>
-        </Card>
-
-        {/* Active Bottlenecks */}
-        <Card className="hover-lift border-slate-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-slate-900">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Primary Bottlenecks
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <BottleneckItem
-              station="Drilling Station"
-              utilization={96}
-              severity="high"
-            />
-            <BottleneckItem
-              station="Quality Check"
-              utilization={81}
-              severity="medium"
-            />
-            <BottleneckItem
-              station="Assembly Station"
-              utilization={72}
-              severity="low"
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Defect Distribution */}
-      <Card className="hover-lift border-slate-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-900">
-            <Eye className="h-5 w-5 text-purple-500" />
-            Defect Distribution Across Classes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-            <DefectTypeCard type="Rust" count={45} total={410} color="from-orange-500 to-red-500" />
-            <DefectTypeCard type="Crack" count={32} total={410} color="from-red-500 to-pink-500" />
-            <DefectTypeCard type="Scratch" count={28} total={410} color="from-yellow-500 to-orange-500" />
-            <DefectTypeCard type="Hole" count={18} total={410} color="from-purple-500 to-pink-500" />
-            <DefectTypeCard type="Normal" count={287} total={410} color="from-green-500 to-emerald-500" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function KPICard({
-  title,
-  value,
-  change,
-  trend,
-  icon,
-  iconColor,
-  bgColor,
-}: {
-  title: string;
-  value: string;
-  change: string;
-  trend: "up" | "down";
-  icon: React.ReactNode;
-  iconColor: string;
-  bgColor: string;
-}) {
-  const isPositive =
-    (trend === "down" && title.includes("Loss")) ||
-    (trend === "down" && title.includes("Defect")) ||
-    (trend === "up" && !title.includes("Defect") && !title.includes("Loss"));
-
-  return (
-    <Card className="hover-lift border-slate-200">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
-            <p className="text-3xl font-bold text-slate-900">{value}</p>
-          </div>
-          <div className={`p-3 rounded-xl ${bgColor}`}>
-            <div className={iconColor}>{icon}</div>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center gap-2">
-          {trend === "up" ? (
-            <TrendingUp className={`h-4 w-4 ${isPositive ? "text-green-600" : "text-red-600"}`} />
-          ) : (
-            <TrendingDown className={`h-4 w-4 ${isPositive ? "text-green-600" : "text-red-600"}`} />
-          )}
-          <span className={`text-sm font-semibold ${isPositive ? "text-green-600" : "text-red-600"}`}>
-            {change}
-          </span>
-          <span className="text-sm text-slate-500">vs nominal baseline</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function BatchItem({
-  batch,
-  images,
-  defects,
-  status,
-  time,
-}: {
-  batch: string;
-  images: number;
-  defects: number;
-  status: string;
-  time: string;
-}) {
-  return (
-    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-100">
-      <div className="flex-1">
-        <div className="font-semibold text-slate-900 mb-1">{batch}</div>
-        <div className="text-sm text-slate-500">
-          {images} images • {defects} defects • {time}
-        </div>
-      </div>
-      <Badge
-        className={
-          status === "completed"
-            ? "bg-green-100 text-green-700 border-green-200"
-            : "bg-blue-100 text-blue-700 border-blue-200"
-        }
-      >
-        {status}
-      </Badge>
-    </div>
-  );
-}
-
-function BottleneckItem({
-  station,
-  utilization,
-  severity,
-}: {
-  station: string;
-  utilization: number;
-  severity: string;
-}) {
-  const severityConfig =
+  const cards = [
     {
-      high: { color: "bg-red-500", badge: "bg-red-100 text-red-700 border-red-200" },
-      medium: { color: "bg-yellow-500", badge: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-      low: { color: "bg-blue-500", badge: "bg-blue-100 text-blue-700 border-blue-200" },
-    }[severity] || { color: "bg-slate-500", badge: "bg-slate-100 text-slate-700 border-slate-200" };
+      title: "Visual Inspection",
+      category: "VISION AI",
+      description: "Detect cracks, scratches, dents and surface defects.",
+      value: yieldPct,
+      label: hasInspectionData
+        ? `${kpis.total_inspected_today} specimens evaluated`
+        : "Awaiting image uploads",
+      badge: hasInspectionData ? "Active" : "Awaiting Data",
+      color: "bg-[#F6BFC4]",
+      icon: Camera,
+      href: "/dashboard/quality",
+    },
+    {
+      title: "Process Analytics",
+      category: "FLOW AI",
+      description: "Analyze production flow, bottlenecks and cycle time.",
+      value: throughput,
+      label: hasProcessData
+        ? "Line throughput capacity"
+        : "Awaiting telemetry CSV",
+      badge: hasProcessData ? "Active" : "Awaiting Data",
+      color: "bg-[#C7E8DC]",
+      icon: Activity,
+      href: "/dashboard/process",
+    },
+    {
+      title: "Root Cause Analysis",
+      category: "RCA ENGINE",
+      description: "Connect defects with machine and process parameters.",
+      value: hasInspectionData ? `${kpis.defects_detected_today}` : "0",
+      label: hasInspectionData
+        ? `${kpis.defects_detected_today} active defect modes mapped`
+        : "0 active defect drivers",
+      badge: hasInspectionData ? "Active" : "Nominal",
+      color: "bg-[#D7C8F5]",
+      icon: Bot,
+      href: "/dashboard/analysis",
+    },
+    {
+      title: "Production Economics",
+      category: "PROFIT AI",
+      description: "Track scrap, rework, downtime and production cost.",
+      value: monthlyLossINR,
+      label: monthlyLossUSD > 0 ? "Monthly cost at risk" : "Zero financial loss recorded",
+      badge: monthlyLossUSD > 0 ? "Active" : "Nominal",
+      color: "bg-[#F8D8B5]",
+      icon: BarChart3,
+      href: "/dashboard/simulator",
+    },
+  ];
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-slate-900">{station}</span>
-        <Badge className={severityConfig.badge}>{severity.toUpperCase()}</Badge>
-      </div>
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600">Utilization</span>
-          <span className="font-semibold text-slate-900">{utilization}%</span>
-        </div>
-        <Progress value={utilization} className="h-2" />
-      </div>
-    </div>
-  );
-}
+    <div className="w-full space-y-6">
+      {/* MAIN CONTENT AREA */}
+      <div className="w-full">
+        {/* Header */}
+        <header className="mb-6">
+          <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">
+            Manufacturing Intelligence
+          </p>
+          <h1 className="text-[38px] md:text-[44px] leading-[1.08] tracking-[-1.5px] font-medium text-[#181818]">
+            ForgeX
+          </h1>
+        </header>
 
-function DefectTypeCard({
-  type,
-  count,
-  total,
-  color,
-}: {
-  type: string;
-  count: number;
-  total: number;
-  color: string;
-}) {
-  const percentage = ((count / total) * 100).toFixed(1);
+        {/* Filter Pills */}
+        <div className="flex gap-2.5 mb-8 overflow-x-auto pb-1 select-none">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-black text-white text-xs font-medium shadow-xs"
+          >
+            <Factory size={16} />
+            Overview
+          </Link>
 
-  return (
-    <div className="text-center space-y-3">
-      <div className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${color} p-0.5 shadow-sm`}>
-        <div className="w-full h-full rounded-2xl bg-white flex items-center justify-center">
-          <span className={`text-2xl font-bold bg-gradient-to-br ${color} text-transparent bg-clip-text`}>
-            {count}
-          </span>
+          <Link
+            href="/dashboard/quality"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-xs font-medium text-[#181818] border border-stone-200/70 hover:bg-stone-50 transition shadow-xs"
+          >
+            <Camera size={16} />
+            Visual Inspection
+          </Link>
+
+          <Link
+            href="/dashboard/process"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-xs font-medium text-[#181818] border border-stone-200/70 hover:bg-stone-50 transition shadow-xs"
+          >
+            <Activity size={16} />
+            Process Flow
+          </Link>
+
+          <Link
+            href="/dashboard/simulator"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-xs font-medium text-[#181818] border border-stone-200/70 hover:bg-stone-50 transition shadow-xs"
+          >
+            <BarChart3 size={16} />
+            Economics & Simulator
+          </Link>
+
+          <Link
+            href="/dashboard/upload"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-xs font-medium text-[#181818] border border-stone-200/70 hover:bg-stone-50 transition shadow-xs ml-auto"
+          >
+            <Package size={16} />
+            Upload Batch
+          </Link>
         </div>
-      </div>
-      <div>
-        <div className="font-semibold text-slate-900">{type}</div>
-        <div className="text-sm text-slate-500">{percentage}%</div>
+
+        {/* Awaiting Data Onboarding Banner */}
+        {!hasAnyData && (
+          <div className="bg-white rounded-[24px] p-5 border border-stone-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/70 flex items-center justify-center shrink-0">
+                <Package size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-stone-900">Awaiting Production Batch & Telemetry</h3>
+                <p className="text-xs text-stone-500 mt-0.5 max-w-2xl leading-relaxed">
+                  You are currently in a fresh workspace with zero simulated or hardcoded data. Upload specimen images (PNG/JPG) or discrete-event CSV logs to trigger real-time AI computer vision, throughput tracking, and root-cause analysis.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/upload"
+              className="px-4 py-2 rounded-full bg-black text-white text-xs font-medium hover:bg-stone-800 transition shrink-0 flex items-center gap-2 shadow-xs"
+            >
+              <Upload size={14} />
+              Upload Batch Data
+            </Link>
+          </div>
+        )}
+
+        {/* SECTION TITLE */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold tracking-wider text-stone-600 uppercase">
+            AI DECISION ENGINES
+          </h2>
+          <Link
+            href="/dashboard/copilot"
+            className="text-xs text-stone-500 hover:text-black flex items-center gap-1 font-medium transition"
+          >
+            Ask AI Copilot
+            <ChevronRight size={14} />
+          </Link>
+        </div>
+
+        {/* AI CARDS GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {cards.map((card) => {
+            const Icon = card.icon;
+
+            return (
+              <Link
+                key={card.title}
+                href={card.href}
+                className={`${card.color} min-h-[220px] rounded-[28px] p-6 relative overflow-hidden hover:scale-[1.015] transition-all duration-200 border border-black/5 shadow-xs group block`}
+              >
+                {/* Top Row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/80 rounded-full flex items-center justify-center shadow-xs">
+                      <Icon size={18} className="text-[#181818]" />
+                    </div>
+                    <span className="text-xs font-semibold tracking-wider text-[#181818]">
+                      {card.category}
+                    </span>
+                  </div>
+
+                  <div className="bg-white/80 rounded-full px-3 py-1 text-[11px] font-medium text-[#181818] shadow-xs">
+                    {card.badge}
+                  </div>
+                </div>
+
+                {/* Bottom Content */}
+                <div className="mt-8">
+                  <h3 className="text-[23px] font-medium tracking-tight mb-1.5 text-[#181818]">
+                    {card.title}
+                  </h3>
+
+                  <p className="text-xs text-black/65 max-w-[320px] leading-relaxed">
+                    {card.description}
+                  </p>
+
+                  <div className="flex items-end justify-between mt-6">
+                    <div>
+                      <div className="text-2xl font-bold tracking-tight text-[#181818]">
+                        {card.value}
+                      </div>
+                      <div className="text-[11px] text-black/55 font-medium">
+                        {card.label}
+                      </div>
+                    </div>
+
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xs group-hover:bg-black group-hover:text-white transition-colors">
+                      <ArrowUpRight size={18} />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* RECENT ALERTS / PRODUCTION EVENTS */}
+        <div className="mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xs font-semibold tracking-wider text-stone-600 uppercase">
+              Recent Production Events & Diagnostics
+            </h2>
+            <span className="text-xs text-stone-500 font-medium">Live telemetry</span>
+          </div>
+
+          {overview?.recent_events && overview.recent_events.length > 0 ? (
+            <div className="bg-white rounded-[28px] p-3 border border-stone-200/60 shadow-xs space-y-2">
+              {overview.recent_events.map((ev: any) => (
+                <div
+                  key={ev.id}
+                  className="flex items-center gap-4 p-3.5 rounded-2xl hover:bg-[#F8F6F3] transition-colors"
+                >
+                  <div
+                    className={`w-11 h-11 rounded-full ${
+                      ev.is_defect ? "bg-[#F6BFC4]" : "bg-[#C7E8DC]"
+                    } flex items-center justify-center shrink-0`}
+                  >
+                    {ev.is_defect ? (
+                      <AlertTriangle size={19} className="text-[#181818]" />
+                    ) : (
+                      <CheckCircle2 size={19} className="text-[#181818]" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-[#181818]">{ev.title}</div>
+                    <div className="text-xs text-stone-500 mt-0.5">
+                      {ev.station} · {ev.timestamp}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs px-3 py-1.5 rounded-full font-medium text-[#181818] ${
+                      ev.is_defect ? "bg-[#FBE7E8]" : "bg-[#E3F4ED]"
+                    }`}
+                  >
+                    {ev.defect_class} ({ev.confidence_pct}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-[28px] p-8 border border-stone-200/60 shadow-xs text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto text-stone-400">
+                <Activity size={22} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-[#181818]">No Production Events Recorded Yet</h3>
+                <p className="text-xs text-stone-500 mt-1 max-w-md mx-auto leading-relaxed">
+                  Live inspection telemetry, automated defect alerts, and process diagnostic events will appear here once specimens or telemetry streams are evaluated.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/upload"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black text-white text-xs font-medium hover:bg-stone-800 transition mt-2 shadow-xs"
+              >
+                <Package size={14} />
+                Upload Batch Data
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

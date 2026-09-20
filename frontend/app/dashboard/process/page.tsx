@@ -11,12 +11,22 @@ import {
   DollarSign,
   Clock,
   Boxes,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { analyzeBottlenecks, analyzeDrift, BottleneckData, DriftData } from "@/lib/api";
+import { SingleUserProcessAnalytics } from "@/components/SingleUserProcessAnalytics";
+import { useAppStore } from "@/lib/store";
+import {
+  analyzeBottlenecks,
+  analyzeDrift,
+  getCurrentProcessState,
+  selectSimulationStream,
+  BottleneckData,
+  DriftData,
+} from "@/lib/api";
 
 const driftPresets: Record<string, number[]> = {
   "Hydraulic Pressure (bar)": [180.2, 181.5, 180.9, 182.1, 185.4, 189.2, 194.5, 201.3, 208.5, 212.0],
@@ -25,24 +35,15 @@ const driftPresets: Record<string, number[]> = {
 };
 
 export default function ProcessPage() {
-  const [stationUtils, setStationUtils] = useState<Record<string, number>>({
-    Drilling: 0.96,
-    Milling: 0.36,
-    Assembly: 0.72,
-    Deburring: 0.58,
-    QualityCheck: 0.81,
-  });
-
-  const [stationQueues, setStationQueues] = useState<Record<string, number>>({
-    Drilling: 4.12,
-    Milling: 0.85,
-    Assembly: 2.09,
-    Deburring: 0.95,
-    QualityCheck: 1.45,
-  });
-
+  const [stationUtils, setStationUtils] = useState<Record<string, number>>({});
+  const [stationQueues, setStationQueues] = useState<Record<string, number>>({});
   const [bottleneckData, setBottleneckData] = useState<BottleneckData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [telemetrySource, setTelemetrySource] = useState<string>("simulation_model_1");
+  const [hasUploadedCsv, setHasUploadedCsv] = useState<boolean>(false);
+  const [selectedStream, setSelectedStream] = useState<string>("model_1");
+  const [viewMode, setViewMode] = useState<"flow" | "benchmarking" | "both">("benchmarking");
+  const { currentUser, uploadedData } = useAppStore();
 
   const [selectedDriftSensor, setSelectedDriftSensor] = useState("Hydraulic Pressure (bar)");
   const [driftResult, setDriftResult] = useState<DriftData | null>(null);
@@ -62,87 +63,182 @@ export default function ProcessPage() {
     }
   };
 
-  const fetchBottleneckAnalysis = async () => {
+  const fetchLiveProcess = async () => {
     setLoading(true);
     try {
-      const res = await analyzeBottlenecks(stationUtils, stationQueues);
+      const res = await getCurrentProcessState();
       if (res.success && res.data) {
-        setBottleneckData(res.data);
+        setTelemetrySource(res.data.source || "simulation");
+        setHasUploadedCsv(res.data.has_uploaded_csv);
+        if (res.data.source?.includes("model_2")) setSelectedStream("model_2");
+        else if (res.data.source?.includes("model_3")) setSelectedStream("model_3");
+        else if (res.data.source?.includes("model_1")) setSelectedStream("model_1");
+
+        const stateData: any = res.data.state;
+        if (stateData) {
+          setBottleneckData(stateData);
+          if (stateData.all_station_utilizations) {
+            setStationUtils(stateData.all_station_utilizations);
+          }
+          if (stateData.all_station_queue_times) {
+            setStationQueues(stateData.all_station_queue_times);
+          }
+        }
       }
-    } catch {
-      // Fallback offline state
-      setBottleneckData({
-        primary_bottleneck: "Drilling",
-        max_utilization: 0.96,
-        line_efficiency_pct: 71.4,
-        total_wip_units: 141.9,
-        estimated_lead_time_hrs: 10.66,
-        bottlenecks: [
-          {
-            station: "Drilling",
-            utilization: 0.96,
-            queue_time_hrs: 4.12,
-            severity: "high",
-            impact: "Station at 96.0% capacity; limits line throughput",
-            recommended_action: "Offload Drilling or increase station parallel buffer capacity",
-          },
-          {
-            station: "QualityCheck",
-            utilization: 0.81,
-            queue_time_hrs: 1.45,
-            severity: "medium",
-            impact: "Station approaching capacity limit (81.0%)",
-            recommended_action: "Monitor QualityCheck cycle times and rebalance line",
-          },
-        ],
-        economic_impact: {
-          hourly_throughput_loss_usd: 906.25,
-          daily_throughput_loss_usd: 21750.0,
-          monthly_throughput_loss_usd: 652500.0,
-        },
-        all_station_utilizations: {
-          Drilling: 0.96,
-          Milling: 0.36,
-          Assembly: 0.72,
-          Deburring: 0.58,
-          QualityCheck: 0.81,
-        },
-        all_station_queue_times: {
-          Drilling: 4.12,
-          Milling: 0.85,
-          Assembly: 2.09,
-          Deburring: 0.95,
-          QualityCheck: 1.45,
-        },
-      });
+    } catch (e) {
+      console.error("Error fetching live process state:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSwitchStream = async (modelName: string) => {
+    setSelectedStream(modelName);
+    setLoading(true);
+    try {
+      const res = await selectSimulationStream(modelName);
+      if (res.success && res.data?.analysis) {
+        setBottleneckData(res.data.analysis);
+        setTelemetrySource(`simulation_${modelName}`);
+        setHasUploadedCsv(false);
+        if (res.data.analysis.all_station_utilizations) {
+          setStationUtils(res.data.analysis.all_station_utilizations);
+        }
+        if (res.data.analysis.all_station_queue_times) {
+          setStationQueues(res.data.analysis.all_station_queue_times);
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBottleneckAnalysis();
+    fetchLiveProcess();
   }, []);
+
+  // INR conversion rate: 1 USD = 83 INR
+  const toINR = (usd: number) => Math.round(usd * 83);
+  const formatINR = (val: number) => `₹${val.toLocaleString("en-IN")}`;
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Process Intelligence & Line Balance</h1>
-          <p className="text-slate-600">
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-4xl font-bold text-slate-900">Process Intelligence & Line Balance</h1>
+            {hasUploadedCsv ? (
+              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+                Uploaded CSV Active
+              </Badge>
+            ) : (
+              <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-semibold">
+                Simulation Model Stream
+              </Badge>
+            )}
+          </div>
+          <p className="text-slate-600 text-sm">
             Discrete-event line balance analysis, Little&apos;s Law lead time forecasting, and economic loss attribution
           </p>
         </div>
         <Button
-          onClick={fetchBottleneckAnalysis}
+          onClick={fetchLiveProcess}
           disabled={loading}
           className="gradient-brand text-white"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Recalculate Bottlenecks
+          Sync Live Telemetry
         </Button>
       </div>
+
+      {/* View Switcher Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+          <button
+            onClick={() => setViewMode("both")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              viewMode === "both"
+                ? "bg-white text-slate-900 shadow-xs font-bold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Combined View
+          </button>
+          <button
+            onClick={() => setViewMode("benchmarking")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              viewMode === "benchmarking"
+                ? "bg-white text-slate-900 shadow-xs font-bold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <TrendingUp className="h-3.5 w-3.5 text-blue-600" />
+            Operator Process &amp; Profitability
+          </button>
+          <button
+            onClick={() => setViewMode("flow")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              viewMode === "flow"
+                ? "bg-white text-slate-900 shadow-xs font-bold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Line Flow &amp; CUSUM Drift
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-500 pr-3 hidden md:flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Analyzing Session: <strong>{currentUser?.full_name || "Active Operator"}</strong></span>
+        </div>
+      </div>
+
+      {/* SECTION 1: Discrete-Event Line Flow & CUSUM Drift */}
+      {((viewMode === "both" && (hasUploadedCsv || uploadedData?.hasAnalyzedData)) || viewMode === "flow") && (
+        <div className="space-y-8">
+      {/* Stream Selection Tabs (Model 1, Model 2, Model 3 from trained Rockwell Arena models) */}
+      <Card className="border-slate-200 bg-slate-50/80 p-4 rounded-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <Activity className="h-4 w-4 text-blue-600" />
+              Discrete-Event Telemetry Source
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {hasUploadedCsv
+                ? `Active stream is derived from uploaded dataset (${telemetrySource}). Click any trained model below to compare.`
+                : "Select a trained Rockwell Arena discrete-event manufacturing simulation model to inspect:"}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={selectedStream === "model_1" ? "default" : "outline"}
+              onClick={() => handleSwitchStream("model_1")}
+              className={`text-xs ${selectedStream === "model_1" ? "bg-blue-600 text-white" : "border-slate-300"}`}
+            >
+              Model 1 (3-Station Sequential)
+            </Button>
+            <Button
+              size="sm"
+              variant={selectedStream === "model_2" ? "default" : "outline"}
+              onClick={() => handleSwitchStream("model_2")}
+              className={`text-xs ${selectedStream === "model_2" ? "bg-blue-600 text-white" : "border-slate-300"}`}
+            >
+              Model 2 (Two-Part Merge)
+            </Button>
+            <Button
+              size="sm"
+              variant={selectedStream === "model_3" ? "default" : "outline"}
+              onClick={() => handleSwitchStream("model_3")}
+              className={`text-xs ${selectedStream === "model_3" ? "bg-blue-600 text-white" : "border-slate-300"}`}
+            >
+              Model 3 (Enterprise 4-SKU Shared)
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Financial & Operational Summary Cards */}
       {bottleneckData && (
@@ -205,10 +301,10 @@ export default function ProcessPage() {
                 <DollarSign className="h-4 w-4 text-red-600" />
               </div>
               <div className="text-2xl font-bold text-red-600 mt-2">
-                ${(bottleneckData.economic_impact.monthly_throughput_loss_usd / 1000).toFixed(1)}K
+                {formatINR(toINR(bottleneckData.economic_impact.monthly_throughput_loss_usd))}
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                ${bottleneckData.economic_impact.hourly_throughput_loss_usd.toFixed(0)}/hr bottleneck cost
+                {formatINR(toINR(bottleneckData.economic_impact.hourly_throughput_loss_usd))}/hr ({bottleneckData.economic_impact.hourly_throughput_loss_usd > 0 ? `$${(bottleneckData.economic_impact.monthly_throughput_loss_usd / 1000).toFixed(1)}K USD` : "$0"})
               </div>
             </CardContent>
           </Card>
@@ -420,6 +516,13 @@ export default function ProcessPage() {
           )}
         </CardContent>
       </Card>
+      </div>
+      )}
+
+      {/* SECTION 2: Single-User Throughput, Profitability & Root-Cause Analytics */}
+      {(viewMode === "both" || viewMode === "benchmarking") && (
+        <SingleUserProcessAnalytics />
+      )}
     </div>
   );
 }

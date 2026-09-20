@@ -27,3 +27,6 @@ class CopilotChatResponse(BaseModel):
     evidence_sources: List[str]
     suggested_actions: List[RecommendedAction]
     confidence_score: float
+    guardrail_status: Optional[str] = "compliant"
+    guardrail_rule_applied: Optional[str] = None
+    guardrail_details: Optional[Dict[str, Any]] = None

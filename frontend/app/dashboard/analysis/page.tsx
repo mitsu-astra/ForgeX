@@ -6,19 +6,69 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Slider } from "@/components/ui/slider";
 import { diagnoseRootCause, getCorrelations, DiagnosisData, CorrelationData } from "@/lib/api";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const PARAM_LABELS: Record<string, { label: string; unit: string }> = {
+  hydraulic_pressure_bar: { label: "Hydraulic Pressure", unit: "bar" },
+  feed_rate_mmpm: { label: "Spindle Feed Rate", unit: "mm/min" },
+  coolant_ph: { label: "Coolant pH", unit: "pH" },
+  conveyor_speed_mps: { label: "Conveyor Speed", unit: "m/s" },
+  station_max_util: { label: "Station Max Utilisation", unit: "" },
+  queue_time_hours: { label: "Queue Time", unit: "hrs" },
+  ambient_humidity_pct: { label: "Ambient Humidity", unit: "%" },
+  spindle_cycles: { label: "Spindle Cycles", unit: "cycles" },
+  tool_wear_index: { label: "Tool Wear Index", unit: "/ 1.0" },
+  wip_buffer_units: { label: "WIP Buffer", unit: "units" },
+  cycle_time_sec: { label: "Cycle Time", unit: "sec" },
+  surface_temp_c: { label: "Surface Temperature", unit: "°C" },
+};
+
 export default function AnalysisPage() {
-  const [pressure, setPressure] = useState([188]);
-  const [coolant, setCoolant] = useState([7.1]);
-  const [speed, setSpeed] = useState([1.25]);
-  const [spindleFeed, setSpindleFeed] = useState([380]);
+  const [activeParams, setActiveParams] = useState<Record<string, number>>({});
+  const [processKpis, setProcessKpis] = useState<{ wip: number | null; leadTime: number | null }>({ wip: null, leadTime: null });
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
   const [correlations, setCorrelations] = useState<CorrelationData | null>(null);
   const [selectedDefect, setSelectedDefect] = useState("rust");
   const [loading, setLoading] = useState(false);
   const [loadingCorr, setLoadingCorr] = useState(false);
+
+  // Fetch active process parameters from backend (populated from uploaded CSV)
+  const fetchActiveParams = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/simulator/baseline`);
+      const json = await res.json();
+      if (json.success && json.data?.parameters) {
+        const params: Record<string, number> = {};
+        for (const [k, v] of Object.entries(json.data.parameters as Record<string, { value: number }>)) {
+          params[k] = typeof v === "object" ? v.value : (v as number);
+        }
+        setActiveParams(params);
+        return params;
+      }
+    } catch {
+      // fallback handled below
+    }
+    return {};
+  };
+
+  // Fetch Total WIP Units and Estimated Lead Time from process current-state
+  const fetchProcessKpis = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/process/current-state`);
+      const json = await res.json();
+      if (json.success && json.data?.state) {
+        const s = json.data.state;
+        setProcessKpis({
+          wip: s.total_wip_units ?? null,
+          leadTime: s.estimated_lead_time_hrs ?? null,
+        });
+      }
+    } catch {
+      // silently ignore
+    }
+  };
 
   const fetchCorrelations = async (defect: string) => {
     setSelectedDefect(defect);
@@ -38,15 +88,20 @@ export default function AnalysisPage() {
   const runDiagnosis = async () => {
     setLoading(true);
     try {
+      const params = Object.keys(activeParams).length > 0 ? activeParams : await fetchActiveParams();
       const res = await diagnoseRootCause({
-        hydraulic_pressure_bar: pressure[0],
-        coolant_ph: coolant[0],
-        conveyor_speed_mps: speed[0],
-        feed_rate_mmpm: spindleFeed[0],
-        queue_time_hours: 4.5,
-        station_max_util: 0.96,
-        spindle_cycles: 4000.0,
-        ambient_humidity_pct: 75.0,
+        hydraulic_pressure_bar: params.hydraulic_pressure_bar ?? 188,
+        coolant_ph: params.coolant_ph ?? 7.1,
+        conveyor_speed_mps: params.conveyor_speed_mps ?? 1.25,
+        feed_rate_mmpm: params.feed_rate_mmpm ?? 380,
+        queue_time_hours: params.queue_time_hours ?? 4.5,
+        station_max_util: params.station_max_util ?? 0.96,
+        spindle_cycles: params.spindle_cycles ?? 4000.0,
+        ambient_humidity_pct: params.ambient_humidity_pct ?? 75.0,
+        tool_wear_index: params.tool_wear_index ?? 0.72,
+        wip_buffer_units: params.wip_buffer_units ?? 45.0,
+        cycle_time_sec: params.cycle_time_sec ?? 142.0,
+        surface_temp_c: params.surface_temp_c ?? 68.0,
       });
       if (res.success && res.data) {
         setDiagnosis(res.data);
@@ -67,30 +122,10 @@ export default function AnalysisPage() {
         shap_explanation: {
           base_value: 0.2,
           top_features: [
-            {
-              feature: "Press Hydraulic Pressure",
-              feature_value: pressure[0],
-              shap_value: 0.462,
-              contribution: "positive",
-            },
-            {
-              feature: "Spindle Feed Rate",
-              feature_value: spindleFeed[0],
-              shap_value: 0.145,
-              contribution: "positive",
-            },
-            {
-              feature: "Coolant Fluid pH",
-              feature_value: coolant[0],
-              shap_value: -0.052,
-              contribution: "negative",
-            },
-            {
-              feature: "Conveyor Belt Speed",
-              feature_value: speed[0],
-              shap_value: 0.038,
-              contribution: "positive",
-            },
+            { feature: "Press Hydraulic Pressure", feature_value: activeParams.hydraulic_pressure_bar ?? 188, shap_value: 0.462, contribution: "positive" },
+            { feature: "Spindle Feed Rate", feature_value: activeParams.feed_rate_mmpm ?? 380, shap_value: 0.145, contribution: "positive" },
+            { feature: "Coolant Fluid pH", feature_value: activeParams.coolant_ph ?? 7.1, shap_value: -0.052, contribution: "negative" },
+            { feature: "Conveyor Belt Speed", feature_value: activeParams.conveyor_speed_mps ?? 1.25, shap_value: 0.038, contribution: "positive" },
           ],
         },
         recommendation: "Recalibrate hydraulic pressure relief valves to 172-180 bar nominal",
@@ -101,9 +136,11 @@ export default function AnalysisPage() {
   };
 
   useEffect(() => {
-    runDiagnosis();
+    fetchActiveParams().then(() => runDiagnosis());
+    fetchProcessKpis();
     fetchCorrelations("rust");
   }, []);
+
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
@@ -121,7 +158,7 @@ export default function AnalysisPage() {
         </Button>
       </div>
 
-      {/* Interactive Process Condition Input Controls */}
+      {/* Read-Only Active Process Parameters from Uploaded CSV */}
       <Card className="hover-lift border-slate-200">
         <CardHeader>
           <CardTitle className="text-lg text-slate-900 flex items-center gap-2">
@@ -129,71 +166,56 @@ export default function AnalysisPage() {
             Active Operating Parameter Conditions
           </CardTitle>
           <CardDescription className="text-slate-600">
-            Adjust process sensor inputs to dynamically recalculate SHAP feature contributions and root-cause probabilities
+            Live sensor values extracted from your uploaded CSV — used to compute SHAP feature contributions and root-cause probabilities
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-700">Hydraulic Pressure</span>
-                <span className="text-blue-600">{pressure[0]} bar</span>
-              </div>
-              <Slider
-                value={pressure}
-                onValueChange={(v) => setPressure(Array.isArray(v) ? [...v] : [v])}
-                min={150}
-                max={210}
-                step={1}
-              />
-              <span className="text-[11px] text-slate-400">Nominal: 175 bar</span>
+          {Object.keys(activeParams).length > 0 ? (
+            <div className="flex flex-row gap-6 w-full">
+              {Object.entries(activeParams)
+                .filter(([k]) => PARAM_LABELS[k])
+                .map(([key, value]) => {
+                  const meta = PARAM_LABELS[key];
+                  return (
+                    <div key={key} className="flex flex-col gap-1 px-5 py-4 rounded-xl bg-slate-50 border border-slate-200 flex-1 min-w-0">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest truncate">{meta.label}</span>
+                      <span className="text-xl font-bold text-slate-900 truncate">
+                        {typeof value === "number" ? value.toFixed(value % 1 === 0 ? 0 : 2) : value}
+                        {meta.unit && <span className="text-xs font-normal text-slate-400 ml-1">{meta.unit}</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+
+              {/* Total WIP Units */}
+              {processKpis.wip !== null && (
+                <div className="flex flex-col gap-1 px-5 py-4 rounded-xl bg-amber-50 border border-amber-200 flex-1 min-w-0">
+                  <span className="text-[11px] font-semibold text-amber-600 uppercase tracking-widest truncate">Total WIP</span>
+                  <span className="text-xl font-bold text-slate-900 truncate">
+                    {processKpis.wip.toFixed(0)}
+                    <span className="text-xs font-normal text-slate-400 ml-1">units</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Estimated Lead Time */}
+              {processKpis.leadTime !== null && (
+                <div className="flex flex-col gap-1 px-5 py-4 rounded-xl bg-purple-50 border border-purple-200 flex-1 min-w-0">
+                  <span className="text-[11px] font-semibold text-purple-600 uppercase tracking-widest truncate">Lead Time</span>
+                  <span className="text-xl font-bold text-slate-900 truncate">
+                    {processKpis.leadTime.toFixed(2)}
+                    <span className="text-xs font-normal text-slate-400 ml-1">hrs</span>
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-700">Coolant pH</span>
-                <span className="text-blue-600">{coolant[0]} pH</span>
-              </div>
-              <Slider
-                value={coolant}
-                onValueChange={(v) => setCoolant(Array.isArray(v) ? [...v] : [v])}
-                min={6.0}
-                max={9.0}
-                step={0.1}
-              />
-              <span className="text-[11px] text-slate-400">Nominal: 7.6-7.8</span>
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-700">Conveyor Speed</span>
-                <span className="text-blue-600">{speed[0]} m/s</span>
-              </div>
-              <Slider
-                value={speed}
-                onValueChange={(v) => setSpeed(Array.isArray(v) ? [...v] : [v])}
-                min={0.5}
-                max={2.0}
-                step={0.05}
-              />
-              <span className="text-[11px] text-slate-400">Nominal: 0.95 m/s</span>
+          ) : (
+            <div className="py-6 text-center text-slate-500 text-sm">
+              No CSV uploaded yet — upload a manufacturing dataset to see live parameter values here.
             </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-700">Spindle Feed Rate</span>
-                <span className="text-blue-600">{spindleFeed[0]} mm/min</span>
-              </div>
-              <Slider
-                value={spindleFeed}
-                onValueChange={(v) => setSpindleFeed(Array.isArray(v) ? [...v] : [v])}
-                min={200}
-                max={500}
-                step={10}
-              />
-              <span className="text-[11px] text-slate-400">Nominal: 320 mm/min</span>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 

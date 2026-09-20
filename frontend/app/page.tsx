@@ -27,19 +27,19 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <div className="text-lg font-bold text-white">IndustryAI</div>
-                <div className="text-xs text-slate-400">Decision Intelligence</div>
+                <div className="text-lg font-bold text-white tracking-tight">ForgeX</div>
+                <div className="text-xs text-slate-400">Industrial Decision Intelligence</div>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Link href="/dashboard" className="text-sm text-slate-300 hover:text-white transition-colors">
-                Demo
+              <Link href="/login" className="text-sm text-slate-300 hover:text-white transition-colors">
+                Sign In
               </Link>
               <Link
                 href="/dashboard"
                 className="inline-flex items-center justify-center rounded-lg text-sm font-medium px-4 py-2 text-white gradient-brand shadow-md hover:opacity-90 transition-all"
               >
-                Get Started <ArrowRight className="ml-2 h-4 w-4" />
+                Launch Platform <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -51,7 +51,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto text-center space-y-8 animate-fade-in">
           <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 px-4 py-1.5">
             <Sparkles className="h-3 w-3 mr-2 inline" />
-            AI-Powered Manufacturing Intelligence
+            ForgeX • Autonomous Manufacturing Intelligence
           </Badge>
 
           <h1 className="text-6xl md:text-7xl font-bold text-white leading-tight tracking-tight">

@@ -1,7 +1,21 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --background: #F8F6F3;
+    --foreground: #181818;
+    --sidebar-bg: #EFE9E3;
+    --panel-bg: #F0E9E4;
+    --card-pink: #F6BFC4;
+    --card-mint: #C7E8DC;
+    --card-lavender: #D7C8F5;
+    --card-peach: #F8D8B5;
+    --accent-lilac: #D6B6C8;
+  }
+
   body {
+    background-color: #F8F6F3;
+    color: #181818;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -80,4 +94,77 @@
   .glow {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
   }
+
+  /* ── Simulator native range slider ──────────────────────────────────────── */
+  .sim-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    border-radius: 9999px;
+    border: 1px solid #cbd5e1;
+    outline: none;
+    cursor: pointer;
+    background-color: #e2e8f0;
+    transition: box-shadow 0.15s ease;
+  }
+
+  .sim-range:focus-visible {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  }
+
+  /* Thumb — Webkit (Chrome, Safari, Edge) */
+  .sim-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--thumb-color, #2563eb);
+    border: 3px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    cursor: grab;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    margin-top: -7px;
+  }
+
+  .sim-range::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.2), 0 2px 8px rgba(0, 0, 0, 0.4);
+    transform: scale(1.15);
+  }
+
+  .sim-range::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.25);
+  }
+
+  /* Thumb — Firefox */
+  .sim-range::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--thumb-color, #2563eb);
+    border: 3px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    cursor: grab;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .sim-range::-moz-range-thumb:hover {
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.2), 0 2px 8px rgba(0, 0, 0, 0.4);
+    transform: scale(1.15);
+  }
+
+  .sim-range::-moz-range-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.25);
+  }
+
+  /* Track Firefox */
+  .sim-range::-moz-range-track {
+    height: 8px;
+    border-radius: 9999px;
+    border: 1px solid #cbd5e1;
+    background-color: #e2e8f0;
+  }
 }
+

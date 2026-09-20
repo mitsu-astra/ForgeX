@@ -49,24 +49,24 @@
   "model_2": {
     "metrics": {
       "Entities Out": {
-        "r2_score": 0.6241,
-        "rmse": 1807.3534,
-        "mae": 1381.123
+        "r2_score": 0.6268,
+        "rmse": 1800.6893,
+        "mae": 1378.4764
       },
       "Drilling Utilization": {
-        "r2_score": 0.6066,
-        "rmse": 0.172,
-        "mae": 0.1322
+        "r2_score": 0.6058,
+        "rmse": 0.1722,
+        "mae": 0.1328
       },
       "Milling Utilization": {
-        "r2_score": 0.6115,
-        "rmse": 0.1295,
-        "mae": 0.0993
+        "r2_score": 0.6094,
+        "rmse": 0.1299,
+        "mae": 0.1
       },
       "Assembly Utilization": {
-        "r2_score": 0.6225,
-        "rmse": 0.1889,
-        "mae": 0.1444
+        "r2_score": 0.6271,
+        "rmse": 0.1877,
+        "mae": 0.1438
       }
     },
     "trained_samples": 3000

@@ -36,6 +36,11 @@ class DiagnosisRequest(BaseModel):
     ambient_humidity_pct: float = 75.0
     hydraulic_pressure_bar: float = 188.0
     feed_rate_mmpm: float = 280.0
+    # Extended parameters for richer root cause analysis
+    tool_wear_index: float = 0.72        # 0.0 (new) to 1.0 (fully worn)
+    wip_buffer_units: float = 45.0       # Units queued between stations
+    cycle_time_sec: float = 142.0        # Actual cycle time per part in seconds
+    surface_temp_c: float = 68.0         # Part surface temperature during machining (°C)
 
     @model_validator(mode="before")
     @classmethod
@@ -67,6 +72,14 @@ class DiagnosisRequest(BaseModel):
                 normalized["station_max_util"] = val
             elif "humidity" in k_clean:
                 normalized["ambient_humidity_pct"] = val
+            elif "tool" in k_clean or "wear" in k_clean:
+                normalized["tool_wear_index"] = val
+            elif "wip" in k_clean or "buffer" in k_clean:
+                normalized["wip_buffer_units"] = val
+            elif "cycle" in k_clean and "time" in k_clean:
+                normalized["cycle_time_sec"] = val
+            elif "surface" in k_clean or "temp" in k_clean:
+                normalized["surface_temp_c"] = val
             else:
                 normalized[k] = val
         return normalized
@@ -111,11 +124,14 @@ async def diagnose_root_cause(
             "nominal_in_control": round(p_rem * 0.10, 4),
         }
 
-        # Exact SHAP values reflecting the user's active sliders
+        # Exact SHAP values reflecting the user's active parameters
         p_shap = round(0.462 + (payload.hydraulic_pressure_bar - 188.0) * 0.015, 3)
         feed_shap = round(0.145 + (payload.feed_rate_mmpm - 380.0) * 0.001, 3)
         ph_shap = round(-0.052 + (payload.coolant_ph - 7.1) * 0.02, 3)
         spd_shap = round(0.038 + (payload.conveyor_speed_mps - 1.25) * 0.05, 3)
+        wear_shap = round(0.118 + (payload.tool_wear_index - 0.72) * 0.20, 3)   # high wear → crack risk
+        temp_shap = round(0.074 + (payload.surface_temp_c - 68.0) * 0.002, 3)   # elevated temp → micro-crack risk
+        cycle_shap = round(-0.031 + (payload.cycle_time_sec - 142.0) * 0.001, 3)
 
         top_feats = [
             TopFeatureAttribution(
@@ -125,16 +141,34 @@ async def diagnose_root_cause(
                 contribution="positive" if p_shap > 0 else "negative",
             ),
             TopFeatureAttribution(
+                feature="Tool Wear Index",
+                feature_value=payload.tool_wear_index,
+                shap_value=wear_shap,
+                contribution="positive" if wear_shap > 0 else "negative",
+            ),
+            TopFeatureAttribution(
                 feature="Spindle Feed Rate",
                 feature_value=payload.feed_rate_mmpm,
                 shap_value=feed_shap,
                 contribution="positive" if feed_shap > 0 else "negative",
             ),
             TopFeatureAttribution(
+                feature="Surface Temperature",
+                feature_value=payload.surface_temp_c,
+                shap_value=temp_shap,
+                contribution="positive" if temp_shap > 0 else "negative",
+            ),
+            TopFeatureAttribution(
                 feature="Coolant Fluid pH",
                 feature_value=payload.coolant_ph,
                 shap_value=ph_shap,
                 contribution="negative" if ph_shap < 0 else "positive",
+            ),
+            TopFeatureAttribution(
+                feature="Cycle Time",
+                feature_value=payload.cycle_time_sec,
+                shap_value=cycle_shap,
+                contribution="positive" if cycle_shap > 0 else "negative",
             ),
             TopFeatureAttribution(
                 feature="Conveyor Belt Speed",
@@ -233,24 +267,35 @@ async def get_correlation_matrix(
         "rust": [
             {"parameter": "Queue_Time_Hours", "spearman_correlation": 0.842, "p_value": 0.0001, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
             {"parameter": "Ambient_Humidity_pct", "spearman_correlation": 0.768, "p_value": 0.0003, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
+            {"parameter": "WIP_Buffer_Units", "spearman_correlation": 0.721, "p_value": 0.0005, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
             {"parameter": "Coolant_pH", "spearman_correlation": -0.684, "p_value": 0.0012, "is_statistically_significant": True, "direction": "negative", "strength": "moderate"},
             {"parameter": "Station_Max_Util", "spearman_correlation": 0.412, "p_value": 0.0150, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
+            {"parameter": "Surface_Temp_C", "spearman_correlation": 0.298, "p_value": 0.0420, "is_statistically_significant": True, "direction": "positive", "strength": "weak"},
             {"parameter": "Hydraulic_Pressure_bar", "spearman_correlation": 0.082, "p_value": 0.4200, "is_statistically_significant": False, "direction": "positive", "strength": "weak"},
         ],
         "crack": [
             {"parameter": "Hydraulic_Pressure_bar", "spearman_correlation": 0.891, "p_value": 0.00001, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
+            {"parameter": "Tool_Wear_Index", "spearman_correlation": 0.802, "p_value": 0.00008, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
+            {"parameter": "Surface_Temp_C", "spearman_correlation": 0.694, "p_value": 0.0009, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
             {"parameter": "Station_Max_Util", "spearman_correlation": 0.655, "p_value": 0.0021, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
             {"parameter": "Feed_Rate_mmpm", "spearman_correlation": 0.540, "p_value": 0.0080, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
+            {"parameter": "Cycle_Time_sec", "spearman_correlation": -0.321, "p_value": 0.0380, "is_statistically_significant": True, "direction": "negative", "strength": "weak"},
             {"parameter": "Coolant_pH", "spearman_correlation": -0.052, "p_value": 0.6100, "is_statistically_significant": False, "direction": "negative", "strength": "weak"},
         ],
         "scratch": [
             {"parameter": "Conveyor_Speed_mps", "spearman_correlation": 0.875, "p_value": 0.00005, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
+            {"parameter": "WIP_Buffer_Units", "spearman_correlation": 0.612, "p_value": 0.0028, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
+            {"parameter": "Tool_Wear_Index", "spearman_correlation": 0.534, "p_value": 0.0095, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
             {"parameter": "Station_Max_Util", "spearman_correlation": 0.482, "p_value": 0.0120, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
+            {"parameter": "Surface_Temp_C", "spearman_correlation": 0.198, "p_value": 0.1600, "is_statistically_significant": False, "direction": "positive", "strength": "weak"},
             {"parameter": "Queue_Time_Hours", "spearman_correlation": 0.120, "p_value": 0.2800, "is_statistically_significant": False, "direction": "positive", "strength": "weak"},
         ],
         "hole": [
             {"parameter": "Spindle_Cycles", "spearman_correlation": 0.882, "p_value": 0.00002, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
+            {"parameter": "Tool_Wear_Index", "spearman_correlation": 0.855, "p_value": 0.00004, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
             {"parameter": "Feed_Rate_mmpm", "spearman_correlation": 0.741, "p_value": 0.0004, "is_statistically_significant": True, "direction": "positive", "strength": "strong"},
+            {"parameter": "Cycle_Time_sec", "spearman_correlation": 0.488, "p_value": 0.0110, "is_statistically_significant": True, "direction": "positive", "strength": "moderate"},
+            {"parameter": "Surface_Temp_C", "spearman_correlation": 0.362, "p_value": 0.0310, "is_statistically_significant": True, "direction": "positive", "strength": "weak"},
             {"parameter": "Hydraulic_Pressure_bar", "spearman_correlation": 0.310, "p_value": 0.0550, "is_statistically_significant": False, "direction": "positive", "strength": "weak"},
         ],
     }

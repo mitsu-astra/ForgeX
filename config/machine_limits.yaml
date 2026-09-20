@@ -1,0 +1,72 @@
+# ==============================================================================
+# MACHINE SAFETY LIMITS CONFIGURATION
+# ==============================================================================
+# NOTE: These values are configurable demonstration placeholders.
+# They are clearly labeled as NOT VALIDATED for real-world industrial machinery.
+# Real-world safety limits must be calibrated by certified plant safety engineers.
+# ==============================================================================
+
+version: "1.0.0"
+environment: "simulation"
+validation_status: "NOT_VALIDATED_PLACEHOLDER"
+
+parameters:
+  hydraulic_pressure:
+    name: "Hydraulic Pressure"
+    unit: "bar"
+    min: 150.0
+    max: 180.0
+    warning_min: 155.0
+    warning_max: 176.0
+    default_setpoint: 168.0
+    max_rate_of_change_per_sec: 10.0
+    category: "hydraulic_forming"
+    description: "Main forming ram hydraulic line pressure."
+
+  coolant_temperature:
+    name: "Coolant Temperature"
+    unit: "°C"
+    min: 60.0
+    max: 120.0
+    warning_min: 70.0
+    warning_max: 105.0
+    default_setpoint: 84.0
+    max_rate_of_change_per_sec: 5.0
+    category: "thermal_management"
+    description: "Recirculating spindle coolant reservoir temperature."
+
+  conveyor_speed:
+    name: "Conveyor Speed"
+    unit: "m/s"
+    min: 0.5
+    max: 2.5
+    warning_min: 0.8
+    warning_max: 2.2
+    default_setpoint: 1.8
+    max_rate_of_change_per_sec: 0.5
+    category: "material_handling"
+    description: "Transfer belt linear speed through inspection stations."
+
+  spindle_feed_rate:
+    name: "Spindle Feed Rate"
+    unit: "mm/min"
+    min: 150.0
+    max: 550.0
+    warning_min: 200.0
+    warning_max: 420.0
+    default_setpoint: 280.0
+    max_rate_of_change_per_sec: 50.0
+    category: "machining"
+    description: "CNC milling spindle axial feed speed."
+
+  machine_cycle_time:
+    name: "Machine Cycle Time"
+    unit: "s"
+    min: 8.0
+    max: 25.0
+    warning_min: 10.0
+    warning_max: 22.0
+    default_setpoint: 14.0
+    max_rate_of_change_per_sec: 2.0
+    category: "line_pace"
+    description: "Target indexing cycle duration per completed part."

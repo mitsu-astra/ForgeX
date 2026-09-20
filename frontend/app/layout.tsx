@@ -8,8 +8,8 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Visual Inspection & Defect Root-Cause Assistant",
-  description: "AI-powered industrial decision support system for manufacturing quality control",
+  title: "ForgeX • Industrial Decision Intelligence",
+  description: "ForgeX: Next-Gen Autonomous Manufacturing Intelligence & Quality Operations",
 };
 
 export default function RootLayout({

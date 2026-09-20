@@ -31,6 +31,7 @@ class ModelService:
         self.root_cause_classifier: Optional[RootCauseClassifier] = None
         self.correlation_engine: Optional[CorrelationEngine] = None
         self.what_if_simulator: Optional[WhatIfSimulatorEngine] = None
+        self.process_surrogate: Optional[ProcessSurrogateModel] = None
         self.is_initialized: bool = False
 
     @classmethod
@@ -51,7 +52,7 @@ class ModelService:
             vision_weights = os.path.join(root_dir, "models", "weights", "efficientnet_b4_defect.pth")
         if correlation_weights is None:
             correlation_weights = os.path.join(root_dir, "models", "weights", "xgboost_correlation.pkl")
-        logger.info("[*] Initializing Industrial AI Decision Intelligence models...")
+        logger.info("[*] Initializing ForgeX • Industrial Decision Intelligence models...")
 
         # 1. Bottleneck Detector
         self.bottleneck_detector = BottleneckDetector()
@@ -68,7 +69,16 @@ class ModelService:
         # 3. What-If Simulator
         self.what_if_simulator = WhatIfSimulatorEngine()
 
-        # 4. Vision Model
+        # 4. Process Surrogate Model
+        process_weights = os.path.join(root_dir, "models", "weights", "xgboost_process.pkl")
+        if os.path.exists(process_weights):
+            try:
+                self.process_surrogate = ProcessSurrogateModel.load(process_weights)
+                logger.info(f"[+] Loaded Process Surrogate Model from {process_weights}")
+            except Exception as e:
+                logger.warning(f"[-] Could not load Process Surrogate Model: {e}")
+
+        # 5. Vision Model
         if os.path.exists(vision_weights):
             try:
                 self.vision_engine = VisionInferenceEngine(weights_path=vision_weights)

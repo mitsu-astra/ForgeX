@@ -14,7 +14,7 @@ if root_dir not in sys.path:
 
 from backend.app.config import settings
 from backend.app.services.model_service import get_model_service
-from backend.app.routers import quality, process, correlation, simulator, upload, copilot, analytics
+from backend.app.routers import quality, process, correlation, simulator, upload, copilot, analytics, auth, system, control, reports
 
 # Logging configuration
 logging.basicConfig(
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     Preloads all AI & Deep Learning models into memory.
     """
     logger.info("=" * 70)
-    logger.info(" STARTING INDUSTRIAL AI DECISION INTELLIGENCE API")
+    logger.info(" STARTING FORGEX • INDUSTRIAL DECISION INTELLIGENCE API")
     logger.info("=" * 70)
 
     # Initialize models
@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
         vision_weights=settings.VISION_MODEL_WEIGHTS,
         correlation_weights=settings.CORRELATION_MODEL_WEIGHTS,
     )
+    logger.info("[✓] All ForgeX core engines initialized.")
 
     # Initialize PostgreSQL Database and seed materials
     from backend.app.db.db_service import init_database
@@ -47,14 +48,13 @@ async def lifespan(app: FastAPI):
 
     yield
 
-
-    logger.info("Shutting down Industrial AI Decision Intelligence API...")
+    logger.info("Shutting down ForgeX Decision Intelligence API...")
 
 
 # Create FastAPI application
 app = FastAPI(
-    title="Industrial AI Decision Intelligence API",
-    description="Multi-Modal Visual Inspection, Discrete-Event Process Surrogates, Root-Cause Explainability, and What-If Simulation API",
+    title="ForgeX • Industrial Decision Intelligence API",
+    description="ForgeX • Industrial Decision Intelligence — Multi-Modal Visual Inspection, Discrete-Event Process Surrogates, Root-Cause Explainability, and What-If Simulation API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -78,6 +78,8 @@ if os.path.exists(train_dir):
     app.mount("/static/train", StaticFiles(directory=train_dir), name="train")
 
 # Include Routers
+app.include_router(auth.router)
+app.include_router(system.router)
 app.include_router(upload.router)
 app.include_router(quality.router)
 app.include_router(process.router)
@@ -85,6 +87,8 @@ app.include_router(correlation.router)
 app.include_router(simulator.router)
 app.include_router(copilot.router)
 app.include_router(analytics.router)
+app.include_router(control.router)
+app.include_router(reports.router)
 
 
 @app.get("/health", tags=["Health"])
@@ -92,7 +96,7 @@ async def health_check():
     model_service = get_model_service()
     return {
         "status": "healthy",
-        "service": "Industrial AI Decision Intelligence API",
+        "service": "ForgeX • Industrial Decision Intelligence API",
         "vision_engine_loaded": model_service.vision_engine is not None,
         "bottleneck_detector_loaded": model_service.bottleneck_detector is not None,
         "root_cause_classifier_loaded": model_service.root_cause_classifier is not None,

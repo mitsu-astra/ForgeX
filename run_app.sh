@@ -7,16 +7,28 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PATH="$PROJECT_DIR/venv"
+if [ -d "$PROJECT_DIR/.venv" ]; then
+    VENV_PATH="$PROJECT_DIR/.venv"
+else
+    VENV_PATH="$PROJECT_DIR/venv"
+fi
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
+
+export KMP_DUPLICATE_LIB_OK=TRUE
+export OMP_NUM_THREADS=4
 
 echo "=============================================================================="
 echo "  🚀 Starting Industrial AI Decision Intelligence Platform"
 echo "=============================================================================="
 
 # 1. Clean up existing stale listeners on ports if any
-if command -v fuser &> /dev/null; then
+if command -v lsof &> /dev/null; then
+    echo "✓ Checking ports $BACKEND_PORT and $FRONTEND_PORT..."
+    lsof -ti:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
+    lsof -ti:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+    sleep 1
+elif command -v fuser &> /dev/null; then
     echo "✓ Checking ports $BACKEND_PORT and $FRONTEND_PORT..."
     fuser -k $BACKEND_PORT/tcp 2>/dev/null || true
     fuser -k $FRONTEND_PORT/tcp 2>/dev/null || true
@@ -39,7 +51,7 @@ python3 -c "import torch; print(f'✓ PyTorch {torch.__version__} | Device: {\"C
 # 4. Start Backend FastAPI Server in background
 echo "✓ Launching FastAPI backend server on port $BACKEND_PORT..."
 export PYTHONPATH="$PROJECT_DIR"
-python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port $BACKEND_PORT --reload &
+python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port $BACKEND_PORT --reload --reload-dir backend/app &
 
 BACKEND_PID=$!
 

@@ -27,15 +27,38 @@ backend/.env
 backend/.env.*
 frontend/.env*
 
-# Datasets and simulation archives / directories
+# Datasets, simulation archives, and manufacturing data
 data/
 backend/data/
 train/
 Manufacturing Data Shared Facility - Discrete-Event Simulation/
 *.zip
 
+# Large model weight files (>50MB — use Git LFS or separate release)
+models/weights/*.pth
+models/weights/*.pth.tar
+
+# SQLite local database (runtime artifact)
+*.db
+*.sqlite
+*.sqlite3
+industrial_ai.db
+
+# Snapshot / duplicate model weight
+models/weights/*_snapshot.pth
+
 # Operating System & IDE
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Logs and runtime artifacts
+*.log
+backend/logs/
+frontend/.turbo/
+
+# Uploaded files (runtime, not source)
+uploads/
+backend/uploads/
+backend/processed/

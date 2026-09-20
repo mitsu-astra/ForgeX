@@ -1,9 +1,7 @@
-"""
-Database Service: Business Logic, State Persistence, and Multi-Modal Cache
-"""
-
+import os
 import json
 import logging
+import hashlib
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from backend.app.db.session import SessionLocal, engine, Base
@@ -16,9 +14,33 @@ from backend.app.db.models import (
     Material,
     SimulationScenario,
     SystemCache,
+    ControlAuditRecord,
+    User,
+    CopilotGuardrail,
+    AnalysisReport,
 )
 
 logger = logging.getLogger("backend.db.service")
+
+
+def hash_password(password: str, salt: Optional[str] = None) -> str:
+    """Hashes a password with PBKDF2-HMAC-SHA256."""
+    if salt is None:
+        salt = os.urandom(16).hex()
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+    return f"{salt}${key.hex()}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Verifies a password against PBKDF2-HMAC-SHA256 stored hash."""
+    try:
+        if not stored_hash or "$" not in stored_hash:
+            return False
+        salt, key_hex = stored_hash.split("$", 1)
+        test_key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+        return test_key.hex() == key_hex
+    except Exception:
+        return False
 
 
 def init_database():
@@ -96,21 +118,105 @@ def init_database():
                 db.commit()
                 logger.info("[DB] Seeded 4 standard industrial materials into PostgreSQL.")
 
-            # Seed default active batch if none exists
-            if db.query(Batch).count() == 0:
-                default_batch = Batch(
-                    batch_id="BATCH-2026-001",
-                    batch_name="Production Batch 2026-001",
-                    active_defect="crack",
-                    active_material="AISI_4140",
-                    status="active",
-                    total_images=142,
-                    defects_count=18,
-                    yield_pct=96.8,
-                )
-                db.add(default_batch)
+            # Seed 5 demo users if table is empty
+            if db.query(User).count() == 0:
+                demo_users = [
+                    User(
+                        email="admin@forgex.ai",
+                        password_hash=hash_password("admin123"),
+                        full_name="Alex Vance",
+                        role="Lead Systems Architect",
+                        avatar_initials="AV",
+                    ),
+                    User(
+                        email="quality.lead@forgex.ai",
+                        password_hash=hash_password("quality123"),
+                        full_name="Sarah Lin",
+                        role="QA & Inspection Lead",
+                        avatar_initials="SL",
+                    ),
+                    User(
+                        email="plant.manager@forgex.ai",
+                        password_hash=hash_password("plant123"),
+                        full_name="Marcus Gallagher",
+                        role="Plant Operations Manager",
+                        avatar_initials="MG",
+                    ),
+                    User(
+                        email="line.operator@forgex.ai",
+                        password_hash=hash_password("operator123"),
+                        full_name="Operator OP-104",
+                        role="Shift Line Operator",
+                        avatar_initials="OP",
+                    ),
+                    User(
+                        email="process.engineer@forgex.ai",
+                        password_hash=hash_password("process123"),
+                        full_name="Dr. Elena Rostova",
+                        role="Metallurgical Reliability Engineer",
+                        avatar_initials="ER",
+                    ),
+                ]
+                db.add_all(demo_users)
                 db.commit()
-                logger.info("[DB] Seeded active batch BATCH-2026-001 into PostgreSQL.")
+                logger.info("[DB] Seeded 5 demo users into PostgreSQL.")
+
+            # Seed default AI Copilot safety guardrails if table is empty
+            if db.query(CopilotGuardrail).count() == 0:
+                default_guardrails = [
+                    CopilotGuardrail(
+                        rule_name="Hydraulic Forming Pressure Ceiling",
+                        rule_text="Do not recommend or permit hydraulic pressure setpoints above 185 bar (or active material critical threshold) to prevent irreversible yield fracture propagation.",
+                        category="Safety",
+                        severity="strict_block",
+                        is_active=True,
+                    ),
+                    CopilotGuardrail(
+                        rule_name="Coolant Chemistry Acidification Boundary",
+                        rule_text="Reject any recommendation that drops coolant pH below 7.2 to avoid Pourbaix electrochemical passive oxide breakdown and toxic vapor evolution.",
+                        category="Metallurgy",
+                        severity="strict_block",
+                        is_active=True,
+                    ),
+                    CopilotGuardrail(
+                        rule_name="High-Impact Human Operator Authorization",
+                        rule_text="Any parameter change with an estimated monthly scrap impact exceeding $10,000 USD must require explicit Lead Engineer confirmation before execution.",
+                        category="Compliance",
+                        severity="advisory_warning",
+                        is_active=True,
+                    ),
+                    CopilotGuardrail(
+                        rule_name="Conveyor Linear Velocity Ceiling",
+                        rule_text="Cap conveyor transfer belt velocity at 1.20 m/s to prevent Archard abrasive micro-scratching on low-hardness aluminum alloys.",
+                        category="Operational",
+                        severity="strict_block",
+                        is_active=True,
+                    ),
+                    CopilotGuardrail(
+                        rule_name="Industrial Domain Relevance & Out-of-Context Filter",
+                        rule_text="Intercept or redirect queries unrelated to industrial manufacturing, visual defect inspection, queue bottleneck telemetry, metallurgy/materials, or plant operations.",
+                        category="Relevance",
+                        severity="advisory_warning",
+                        is_active=True,
+                    ),
+                ]
+                db.add_all(default_guardrails)
+                db.commit()
+                logger.info("[DB] Seeded 5 default AI Copilot safety & relevance guardrails into PostgreSQL.")
+
+            # Ensure the Out-of-Context Relevance rule exists if missing from earlier runs
+            relevance_rule = db.query(CopilotGuardrail).filter(CopilotGuardrail.rule_name == "Industrial Domain Relevance & Out-of-Context Filter").first()
+            if not relevance_rule:
+                ooc_rule = CopilotGuardrail(
+                    rule_name="Industrial Domain Relevance & Out-of-Context Filter",
+                    rule_text="Intercept or redirect queries unrelated to industrial manufacturing, visual defect inspection, queue bottleneck telemetry, metallurgy/materials, or plant operations.",
+                    category="Relevance",
+                    severity="advisory_warning",
+                    is_active=True,
+                )
+                db.add(ooc_rule)
+                db.commit()
+                logger.info("[DB] Seeded missing Industrial Domain Relevance guardrail into PostgreSQL.")
 
         finally:
             db.close()
@@ -242,6 +348,93 @@ class DatabaseService:
             db.close()
 
     @staticmethod
+    def get_recent_inspections(limit: int = 50) -> List[Dict[str, Any]]:
+        """Fetches recent inspection records from PostgreSQL."""
+        db = SessionLocal()
+        try:
+            records = (
+                db.query(InspectionRecord)
+                .order_by(InspectionRecord.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            results = []
+            for r in records:
+                boxes = json.loads(r.bounding_boxes_json) if r.bounding_boxes_json else []
+                results.append({
+                    "filename": r.filename,
+                    "prediction": {
+                        "defect_class": r.defect_class,
+                        "confidence": r.confidence,
+                        "class_id": 0,
+                        "probabilities": {r.defect_class: r.confidence},
+                    },
+                    "uncertainty": {
+                        "uncertainty_score": r.uncertainty_score,
+                        "is_uncertain": r.is_uncertain,
+                        "threshold": 0.15,
+                        "confidence_interval_95": [
+                            round(max(0.0, r.confidence - 0.03), 3),
+                            round(min(1.0, r.confidence + 0.02), 3),
+                        ],
+                    },
+                    "localization": {
+                        "bounding_boxes": boxes,
+                        "defect_area_percentage": r.defect_area_pct,
+                    },
+                    "inference_time_ms": r.inference_time_ms,
+                    "status": "success",
+                    "inspected_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                })
+            return results
+        except Exception as e:
+            logger.error(f"[DB] Error getting recent inspections: {e}")
+            return []
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_uploaded_files(limit: int = 50) -> List[Dict[str, Any]]:
+        """Fetches recent uploaded files from PostgreSQL/SQLite."""
+        db = SessionLocal()
+        try:
+            records = (
+                db.query(UploadedFile)
+                .order_by(UploadedFile.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "id": r.id,
+                    "filename": r.filename,
+                    "file_type": r.file_type,
+                    "detected_subtype": r.detected_subtype,
+                    "file_size_bytes": r.file_size_bytes,
+                    "batch_id": r.batch_id,
+                    "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                }
+                for r in records
+            ]
+        except Exception as e:
+            logger.error(f"[DB] Error getting uploaded files: {e}")
+            return []
+        finally:
+            db.close()
+
+    @staticmethod
+    def has_uploaded_files() -> bool:
+        """Returns True if user has uploaded any files."""
+        db = SessionLocal()
+        try:
+            return db.query(UploadedFile).count() > 0
+        except Exception as e:
+            logger.error(f"[DB] Error checking uploaded files: {e}")
+            return False
+        finally:
+            db.close()
+
+    @staticmethod
     def get_material(code: str) -> Optional[Material]:
         """Gets material properties by code."""
         db = SessionLocal()
@@ -316,6 +509,36 @@ class DatabaseService:
             db.close()
 
     @staticmethod
+    def get_latest_process_state(batch_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Retrieves the latest process state recorded in PostgreSQL."""
+        db = SessionLocal()
+        try:
+            query = db.query(ProcessState)
+            if batch_id:
+                query = query.filter(ProcessState.batch_id == batch_id)
+            ps = query.order_by(ProcessState.created_at.desc()).first()
+            if not ps:
+                return None
+            return {
+                "batch_id": ps.batch_id,
+                "primary_bottleneck": ps.primary_bottleneck,
+                "max_utilization": ps.max_utilization,
+                "line_efficiency_pct": ps.line_efficiency_pct,
+                "estimated_lead_time_hrs": ps.estimated_lead_time_hrs,
+                "total_wip_units": ps.total_wip_units,
+                "hourly_throughput_loss_usd": ps.hourly_throughput_loss_usd,
+                "monthly_throughput_loss_usd": ps.monthly_throughput_loss_usd,
+                "station_utilizations": json.loads(ps.station_utilizations_json) if ps.station_utilizations_json else {},
+                "station_queues": json.loads(ps.station_queues_json) if ps.station_queues_json else {},
+                "created_at": ps.created_at.strftime("%Y-%m-%d %H:%M:%S") if ps.created_at else "",
+            }
+        except Exception as e:
+            logger.error(f"[DB] Error getting latest process state: {e}")
+            return None
+        finally:
+            db.close()
+
+    @staticmethod
     def record_root_cause(
         batch_id: str,
         root_cause: str,
@@ -380,6 +603,44 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"[DB] Error recording simulation scenario: {e}")
             db.rollback()
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_simulation_scenarios(batch_id: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+        """Retrieves recent simulation scenarios from database."""
+        db = SessionLocal()
+        try:
+            query = db.query(SimulationScenario)
+            if batch_id:
+                query = query.filter(SimulationScenario.batch_id == batch_id)
+            scenarios = query.order_by(SimulationScenario.created_at.desc()).limit(limit).all()
+            results = []
+            for s in scenarios:
+                params = {}
+                if s.parameters_json:
+                    try:
+                        params = json.loads(s.parameters_json)
+                    except Exception:
+                        params = {}
+                results.append({
+                    "id": s.id,
+                    "batch_id": s.batch_id,
+                    "material_code": s.material_code,
+                    "baseline_defect_pct": s.baseline_defect_pct,
+                    "simulated_defect_pct": s.simulated_defect_pct,
+                    "defect_reduction_pct": s.defect_reduction_pct,
+                    "throughput_change_pct": s.throughput_change_pct,
+                    "monthly_savings_usd": s.monthly_savings_usd,
+                    "recommendation_score": s.recommendation_score,
+                    "risk_level": s.risk_level,
+                    "parameters": params,
+                    "created_at": s.created_at.strftime("%Y-%m-%d %H:%M:%S") if s.created_at else None,
+                })
+            return results
+        except Exception as e:
+            logger.error(f"[DB] Error querying simulation scenarios: {e}")
+            return []
         finally:
             db.close()
 
@@ -480,5 +741,409 @@ class DatabaseService:
                 return json.loads(item.cache_value)
             except Exception:
                 return item.cache_value
+        finally:
+            db.close()
+
+    # In-memory audit fallback
+    _in_memory_audit_trail: List[Dict[str, Any]] = []
+
+    @staticmethod
+    def record_control_audit(
+        event_id: str,
+        parameter: str,
+        parameter_name: str,
+        old_value: float,
+        requested_value: float,
+        validated_value: float,
+        applied_value: float,
+        verified_value: float,
+        unit: str,
+        operator_id: str = "OP-104",
+        source: str = "manual",
+        mode: str = "simulation",
+        validation_result: str = "passed",
+        application_result: str = "success",
+        verification_result: str = "match",
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Records an immutable control audit log entry."""
+        audit_dict = {
+            "event_id": event_id,
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "parameter": parameter,
+            "parameter_name": parameter_name,
+            "old_value": old_value,
+            "requested_value": requested_value,
+            "validated_value": validated_value,
+            "applied_value": applied_value,
+            "verified_value": verified_value,
+            "unit": unit,
+            "operator_id": operator_id,
+            "source": source,
+            "mode": mode,
+            "validation_result": validation_result,
+            "application_result": application_result,
+            "verification_result": verification_result,
+            "notes": notes,
+        }
+        # Prepend to in-memory list
+        DatabaseService._in_memory_audit_trail.insert(0, audit_dict)
+
+        # Also persist to PostgreSQL if table exists
+        db = SessionLocal()
+        try:
+            rec = ControlAuditRecord(
+                event_id=event_id,
+                parameter=parameter,
+                parameter_name=parameter_name,
+                old_value=old_value,
+                requested_value=requested_value,
+                validated_value=validated_value,
+                applied_value=applied_value,
+                verified_value=verified_value,
+                unit=unit,
+                operator_id=operator_id,
+                source=source,
+                mode=mode,
+                validation_result=validation_result,
+                application_result=application_result,
+                verification_result=verification_result,
+                notes=notes,
+            )
+            db.add(rec)
+            db.commit()
+        except Exception as e:
+            logger.warning(f"[DB] Error writing ControlAuditRecord to DB (falling back to memory): {e}")
+            db.rollback()
+        finally:
+            db.close()
+
+        return audit_dict
+
+    @staticmethod
+    def get_control_audit_trail(limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieves historical audit entries (combining DB and memory)."""
+        db = SessionLocal()
+        try:
+            records = (
+                db.query(ControlAuditRecord)
+                .order_by(ControlAuditRecord.timestamp.desc())
+                .limit(limit)
+                .all()
+            )
+            if records:
+                return [
+                    {
+                        "event_id": r.event_id,
+                        "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if r.timestamp else "",
+                        "parameter": r.parameter,
+                        "parameter_name": r.parameter_name,
+                        "old_value": r.old_value,
+                        "requested_value": r.requested_value,
+                        "validated_value": r.validated_value,
+                        "applied_value": r.applied_value,
+                        "verified_value": r.verified_value,
+                        "unit": r.unit,
+                        "operator_id": r.operator_id,
+                        "source": r.source,
+                        "mode": r.mode,
+                        "validation_result": r.validation_result,
+                        "application_result": r.application_result,
+                        "verification_result": r.verification_result,
+                        "notes": r.notes,
+                    }
+                    for r in records
+                ]
+        except Exception as e:
+            logger.warning(f"[DB] Error querying ControlAuditRecord: {e}")
+        finally:
+            db.close()
+
+        return DatabaseService._in_memory_audit_trail[:limit]
+
+    # -----------------------------------------------------------------------
+    # USER AUTHENTICATION & DEMO PERSONAS
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
+        """Authenticates a user by email and password hash."""
+        db = SessionLocal()
+        try:
+            clean_email = email.strip().lower()
+            alt_email = (
+                clean_email.replace("@industrial.ai", "@forgex.ai")
+                if "@industrial.ai" in clean_email
+                else clean_email.replace("@forgex.ai", "@industrial.ai")
+            )
+            user = (
+                db.query(User)
+                .filter((User.email == clean_email) | (User.email == alt_email))
+                .first()
+            )
+            if not user:
+                return None
+            if verify_password(password, user.password_hash):
+                return {
+                    "id": user.id,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": user.role,
+                    "avatar_initials": user.avatar_initials,
+                    "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "",
+                }
+            return None
+        except Exception as e:
+            logger.error(f"[DB] Error authenticating user {email}: {e}")
+            return None
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+        """Fetches a user profile by email."""
+        db = SessionLocal()
+        try:
+            clean_email = email.strip().lower()
+            alt_email = (
+                clean_email.replace("@industrial.ai", "@forgex.ai")
+                if "@industrial.ai" in clean_email
+                else clean_email.replace("@forgex.ai", "@industrial.ai")
+            )
+            user = (
+                db.query(User)
+                .filter((User.email == clean_email) | (User.email == alt_email))
+                .first()
+            )
+            if not user:
+                return None
+            return {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role,
+                "avatar_initials": user.avatar_initials,
+                "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "",
+            }
+        except Exception as e:
+            logger.error(f"[DB] Error fetching user by email: {e}")
+            return None
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_demo_users() -> List[Dict[str, Any]]:
+        """Returns all seeded demo users for quick persona switching."""
+        db = SessionLocal()
+        try:
+            users = db.query(User).order_by(User.id.asc()).all()
+            demo_password_map = {
+                "admin@industrial.ai": "admin123",
+                "quality.lead@industrial.ai": "quality123",
+                "plant.manager@industrial.ai": "plant123",
+                "line.operator@industrial.ai": "operator123",
+                "process.engineer@industrial.ai": "process123",
+            }
+            return [
+                {
+                    "id": u.id,
+                    "email": u.email,
+                    "full_name": u.full_name,
+                    "role": u.role,
+                    "avatar_initials": u.avatar_initials,
+                    "demo_password": demo_password_map.get(u.email, "demo123"),
+                }
+                for u in users
+            ]
+        except Exception as e:
+            logger.error(f"[DB] Error fetching demo users: {e}")
+            return []
+        finally:
+            db.close()
+
+    # -----------------------------------------------------------------------
+    # COPILOT GUARDRAILS & SAFETY RULES
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def get_guardrails(active_only: bool = False) -> List[Dict[str, Any]]:
+        """Retrieves all Copilot safety guardrails from PostgreSQL."""
+        db = SessionLocal()
+        try:
+            query = db.query(CopilotGuardrail)
+            if active_only:
+                query = query.filter(CopilotGuardrail.is_active == True)
+            rules = query.order_by(CopilotGuardrail.id.asc()).all()
+            return [
+                {
+                    "id": r.id,
+                    "rule_name": r.rule_name,
+                    "rule_text": r.rule_text,
+                    "category": r.category,
+                    "severity": r.severity,
+                    "is_active": r.is_active,
+                    "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                }
+                for r in rules
+            ]
+        except Exception as e:
+            logger.error(f"[DB] Error getting guardrails: {e}")
+            return []
+        finally:
+            db.close()
+
+    @staticmethod
+    def create_guardrail(
+        rule_name: str,
+        rule_text: str,
+        category: str = "Safety",
+        severity: str = "strict_block",
+    ) -> Optional[Dict[str, Any]]:
+        """Creates a new AI Copilot safety guardrail rule."""
+        db = SessionLocal()
+        try:
+            rule = CopilotGuardrail(
+                rule_name=rule_name,
+                rule_text=rule_text,
+                category=category,
+                severity=severity,
+                is_active=True,
+            )
+            db.add(rule)
+            db.commit()
+            db.refresh(rule)
+            logger.info(f"[DB] Created new Copilot guardrail: {rule_name}")
+            return {
+                "id": rule.id,
+                "rule_name": rule.rule_name,
+                "rule_text": rule.rule_text,
+                "category": rule.category,
+                "severity": rule.severity,
+                "is_active": rule.is_active,
+                "created_at": rule.created_at.strftime("%Y-%m-%d %H:%M:%S") if rule.created_at else "",
+            }
+        except Exception as e:
+            logger.error(f"[DB] Error creating guardrail: {e}")
+            db.rollback()
+            return None
+        finally:
+            db.close()
+
+    @staticmethod
+    def toggle_guardrail(guardrail_id: int, is_active: bool) -> bool:
+        """Toggles the active state of a Copilot guardrail rule."""
+        db = SessionLocal()
+        try:
+            rule = db.query(CopilotGuardrail).filter(CopilotGuardrail.id == guardrail_id).first()
+            if not rule:
+                return False
+            rule.is_active = is_active
+            db.commit()
+            logger.info(f"[DB] Toggled guardrail #{guardrail_id} active={is_active}")
+            return True
+        except Exception as e:
+            logger.error(f"[DB] Error toggling guardrail: {e}")
+            db.rollback()
+            return False
+        finally:
+            db.close()
+
+    @staticmethod
+    def delete_guardrail(guardrail_id: int) -> bool:
+        """Deletes a Copilot guardrail rule."""
+        db = SessionLocal()
+        try:
+            rule = db.query(CopilotGuardrail).filter(CopilotGuardrail.id == guardrail_id).first()
+            if not rule:
+                return False
+            db.delete(rule)
+            db.commit()
+            logger.info(f"[DB] Deleted guardrail #{guardrail_id}")
+            return True
+        except Exception as e:
+            logger.error(f"[DB] Error deleting guardrail: {e}")
+            db.rollback()
+            return False
+        finally:
+            db.close()
+    # -------------------------------------------------------------------------
+    # AnalysisReport CRUD
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def create_report(batch_id: str, report_id: str) -> Optional["AnalysisReport"]:
+        """Create a new AnalysisReport record in PENDING state."""
+        db = SessionLocal()
+        try:
+            record = AnalysisReport(
+                report_id=report_id,
+                batch_id=batch_id,
+                status="PENDING",
+                created_at=datetime.utcnow(),
+            )
+            db.add(record)
+            db.commit()
+            db.refresh(record)
+            logger.info(f"[DB] Created AnalysisReport {report_id} for batch {batch_id}")
+            return record
+        except Exception as e:
+            logger.error(f"[DB] Error creating report: {e}")
+            db.rollback()
+            return None
+        finally:
+            db.close()
+
+    @staticmethod
+    def update_report(report_id: str, **fields) -> bool:
+        """Update fields on an AnalysisReport by report_id."""
+        db = SessionLocal()
+        try:
+            record = db.query(AnalysisReport).filter(AnalysisReport.report_id == report_id).first()
+            if not record:
+                return False
+            for k, v in fields.items():
+                setattr(record, k, v)
+            db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"[DB] Error updating report {report_id}: {e}")
+            db.rollback()
+            return False
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_report(report_id: str) -> Optional["AnalysisReport"]:
+        """Retrieve a single AnalysisReport by report_id."""
+        db = SessionLocal()
+        try:
+            return db.query(AnalysisReport).filter(AnalysisReport.report_id == report_id).first()
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_report_by_batch(batch_id: str) -> Optional["AnalysisReport"]:
+        """Retrieve the most recent AnalysisReport for a batch."""
+        db = SessionLocal()
+        try:
+            return (
+                db.query(AnalysisReport)
+                .filter(AnalysisReport.batch_id == batch_id)
+                .order_by(AnalysisReport.created_at.desc())
+                .first()
+            )
+        finally:
+            db.close()
+
+    @staticmethod
+    def list_reports() -> List["AnalysisReport"]:
+        """Return all AnalysisReport records, newest first."""
+        db = SessionLocal()
+        try:
+            return (
+                db.query(AnalysisReport)
+                .order_by(AnalysisReport.created_at.desc())
+                .all()
+            )
         finally:
             db.close()
